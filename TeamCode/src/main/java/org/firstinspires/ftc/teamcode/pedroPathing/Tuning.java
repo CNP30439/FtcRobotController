@@ -25,6 +25,8 @@ import com.pedropathing.util.*;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
+import org.firstinspires.ftc.teamcode.pedro.Constants;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -437,7 +439,7 @@ class ForwardVelocityTuner extends OpMode {
 class LateralVelocityTuner extends OpMode {
     private final ArrayList<Double> velocities = new ArrayList<>();
 
-    public static double DISTANCE = 48;
+    public static double DISTANCE = 20;
     public static double RECORD_NUMBER = 10;
 
     private boolean end;
@@ -493,7 +495,7 @@ class LateralVelocityTuner extends OpMode {
                 end = true;
                 stopRobot();
             } else {
-                follower.setTeleOpDrive(0,1,0,true);
+                follower.setTeleOpDrive(0,-1,0,true);
                 double currentVelocity = Math.abs(follower.getVelocity().dot(new Vector(1, Math.PI / 2)));
                 velocities.add(currentVelocity);
                 velocities.remove(0);
@@ -643,7 +645,7 @@ class ForwardZeroPowerAccelerationTuner extends OpMode {
  */
 class LateralZeroPowerAccelerationTuner extends OpMode {
     private final ArrayList<Double> accelerations = new ArrayList<>();
-    public static double VELOCITY = 30;
+    public static double VELOCITY = 18;
     private double previousVelocity;
     private long previousTimeNano;
     private boolean stopping;
@@ -672,7 +674,7 @@ class LateralZeroPowerAccelerationTuner extends OpMode {
     public void start() {
         follower.startTeleopDrive(false);
         follower.update();
-        follower.setTeleOpDrive(0,1,0,true);
+        follower.setTeleOpDrive(0,-1,0,true);
     }
 
     /**
