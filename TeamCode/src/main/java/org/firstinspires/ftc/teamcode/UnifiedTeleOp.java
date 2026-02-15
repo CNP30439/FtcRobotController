@@ -10,10 +10,13 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
+import com.qualcomm.robotcore.hardware.PwmControl;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
+import com.qualcomm.robotcore.hardware.ServoImplEx;
 
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -29,7 +32,8 @@ public class UnifiedTeleOp extends LinearOpMode {
     private DcMotor fi;
     private Servo ha;
     private CRServo tl, tr;
-    private Servo armLeft, armBack, armRight;
+    // Change your declarations at the top
+    private ServoImplEx armLeft, armBack, armRight;
     private ColorSensor leftCs, backCs, rightCs;
     private GoBildaPinpointDriver pinpoint;
     private Limelight3A limelight;
@@ -70,8 +74,9 @@ public class UnifiedTeleOp extends LinearOpMode {
     final int COLOR_DETECT_THRESHOLD = 100;
 
     // Updated tuned shooter velocities from Blue Purple-Green-Purple
-    private final double HIGH_VELOCITY = 950;
-    private final double LOW_VELOCITY = 810;
+    private final double HIGH_VELOCITY = 900;
+    private final double LOW_VELOCITY = 760;
+
 
     // Priority order will be set based on selected mode
     private String[] priorityOrder;
@@ -79,15 +84,15 @@ public class UnifiedTeleOp extends LinearOpMode {
     private int sequenceStep = 0;
     private boolean sequenceActive = false;
     private long armMoveStartTime = 0;
-    private final long ARM_MOVE_DELAY = 500; // Updated from Blue Purple-Green-Purple
+    private final long ARM_MOVE_DELAY = 300; // Updated from Blue Purple-Green-Purple
     private boolean armLifted = false;
 
     // ---- FOURTH COLOR SENSOR (4b) ----
-    private ColorSensor fourthCs;
+    private DistanceSensor fourthDs;
     private long fourthSensorDetectionStart = 0;
     private boolean fourthSensorDetecting = false;
     private boolean spittingOut = false;
-    private static final long DETECTION_TIME_THRESHOLD = 2000; // 2 seconds in milliseconds
+    private static final long DETECTION_TIME_THRESHOLD = 1; // 2 seconds in milliseconds
 
     boolean lastX = false, lastY = false;
 
@@ -167,15 +172,18 @@ public class UnifiedTeleOp extends LinearOpMode {
         tl = hardwareMap.get(CRServo.class, "tl");
         tr = hardwareMap.get(CRServo.class, "tr");
 
-        armLeft  = hardwareMap.get(Servo.class, "al");
-        armBack  = hardwareMap.get(Servo.class, "ab");
-        armRight = hardwareMap.get(Servo.class, "ar");
+        armLeft  = hardwareMap.get(ServoImplEx.class, "al");
+        armBack  = hardwareMap.get(ServoImplEx.class, "ab");
+        armRight = hardwareMap.get(ServoImplEx.class, "ar");
+
+        armLeft.setPwmRange(new PwmControl.PwmRange(500, 2500));
+        armBack.setPwmRange(new PwmControl.PwmRange(500, 2500));
+        armRight.setPwmRange(new PwmControl.PwmRange(500, 2500));
 
         leftCs  = hardwareMap.get(ColorSensor.class, "leftCs");
         backCs  = hardwareMap.get(ColorSensor.class, "backCs");
         rightCs = hardwareMap.get(ColorSensor.class, "rightCs");
-        fourthCs = hardwareMap.get(ColorSensor.class, "4b");
-
+        fourthDs = hardwareMap.get(DistanceSensor.class, "4b");
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         configurePinpoint();
         // Initialize Prism LED driver
@@ -222,8 +230,8 @@ public class UnifiedTeleOp extends LinearOpMode {
         s2.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, shooterPIDF);
 
         ha.setPosition(0.4);
-        armLeft.setPosition(.9);
-        armBack.setPosition(1);
+        armLeft.setPosition(.85);
+        armBack.setPosition(.9);
         armRight.setPosition(1);
 
         // Initialize LEDs to Artboard 1 (not full)
@@ -337,9 +345,7 @@ public class UnifiedTeleOp extends LinearOpMode {
             }
 
             // ---- INTAKE ----
-// Check fourth sensor (4b) for spit-out logic
-            String fourthColor = detectBallColor(fourthCs);
-            boolean fourthDetectingBall = !fourthColor.equals("None");
+            boolean fourthDetectingBall = fourthDs.getDistance(DistanceUnit.CM) < 12.7;
 
 // Count detected balls in main sensors
             int mainBallCount = 0;
@@ -348,31 +354,27 @@ public class UnifiedTeleOp extends LinearOpMode {
             if (!detectBallColor(rightCs).equals("None")) mainBallCount++;
 
 // Handle detection timing for fourth sensor
-            if (fourthDetectingBall && mainBallCount == 3 && (fourthColor.equals("Purple") || fourthColor.equals("Green"))) {
-                if (!fourthSensorDetecting) {
-                    // Ball just detected, start timer
-                    fourthSensorDetectionStart = System.currentTimeMillis();
-                    fourthSensorDetecting = true;
-                } else {
-                    // Ball still detected, check if time threshold passed
-                    long detectionDuration = System.currentTimeMillis() - fourthSensorDetectionStart;
-                    if (detectionDuration >= DETECTION_TIME_THRESHOLD) {
+            if (!spittingOut) {
+                if (mainBallCount == 3 && fourthDetectingBall) {
+                    if (!fourthSensorDetecting) {
+                        fourthSensorDetectionStart = System.currentTimeMillis();
+                        fourthSensorDetecting = true;
+                    } else if (System.currentTimeMillis() - fourthSensorDetectionStart >= DETECTION_TIME_THRESHOLD) {
                         spittingOut = true;
+                        fourthSensorDetecting = false;
                     }
+                } else {
+                    fourthSensorDetecting = false;
+                    fourthSensorDetectionStart = 0;
                 }
             } else {
-                // No ball detected or not full or wrong color
-                fourthSensorDetecting = false;
-                fourthSensorDetectionStart = 0;
-                if (spittingOut && !fourthDetectingBall) {
-                    // Ball has been spit out successfully
+                if (!fourthDetectingBall) {
                     spittingOut = false;
                 }
             }
 
 // Control intake motor
             if (spittingOut) {
-                // Spit out the ball (reverse)
                 fi.setPower(1);
             } else if (gamepad2.x) {
                 fi.setPower(1);
@@ -594,9 +596,10 @@ public class UnifiedTeleOp extends LinearOpMode {
         }
     }
     private void liftArm(String a) {
-        if (a.equals("left")) armLeft.setPosition(0.3);
-        if (a.equals("back")) armBack.setPosition(0.3);
-        if (a.equals("right")) armRight.setPosition(0.3);
+        if (a.equals("left")) armLeft.setPosition(0.4
+        );
+        if (a.equals("back")) armBack.setPosition(0.4);
+        if (a.equals("right")) armRight.setPosition(0.45);
     }
 
     private void lowerArm(String a) {
