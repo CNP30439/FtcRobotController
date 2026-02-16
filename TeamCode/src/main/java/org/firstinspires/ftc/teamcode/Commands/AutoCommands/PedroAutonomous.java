@@ -41,7 +41,7 @@ public class PedroAutonomous extends OpMode {
         panelsTelemetry.update(telemetry);
 
         follower = Constants.createFollower(hardwareMap);
-        follower.setStartingPose(new Pose(72, 8, Math.toRadians(90)));
+        follower.setStartingPose(new Pose(122.457, 125.028, Math.toRadians(37)));
 
         pathTimer = new ElapsedTime();
         paths = new Paths(follower); // Build paths
@@ -74,13 +74,13 @@ public class PedroAutonomous extends OpMode {
                     .addPath(
                             new BezierLine(new Pose(122.457, 125.028), new Pose(80.644, 83.644))
                     )
-                    .setLinearHeadingInterpolation(Math.toRadians(37), Math.toRadians(37))
+                    .setConstantHeadingInterpolation(Math.toRadians(37))
                     .build();
 
             line2 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(80.644, 83.644), new Pose(124.471, 83.644))
+                            new BezierLine(new Pose(80.644, 83.644), new Pose(122.457, 83.644))
                     )
                     .setTangentHeadingInterpolation()
                     .build();
@@ -88,7 +88,7 @@ public class PedroAutonomous extends OpMode {
             line3 = follower
                     .pathBuilder()
                     .addPath(
-                            new BezierLine(new Pose(124.471, 83.644), new Pose(80.644, 83.644))
+                            new BezierLine(new Pose(122.457, 83.644), new Pose(80.644, 83.644))
                     )
                     .setTangentHeadingInterpolation()
                     .setReversed()
